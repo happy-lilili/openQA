@@ -20,6 +20,8 @@ use Mojo::Exception;
 use OpenQA::File;
 use Carp 'croak';
 use Mojo::Asset::Memory;
+use Mojo::File qw(path);
+use OpenQA::Utils qw(assetdir);
 
 has max_retrials => 5;
 
@@ -37,7 +39,24 @@ sub asset {
 
     my $uri = "jobs/$job_id";
     $opts->{asset} //= 'public';
-    my $file_name  = (!$opts->{name}) ? path($opts->{file})->basename : $opts->{name};
+    my $file_name = (!$opts->{name}) ? path($opts->{file})->basename : $opts->{name};
+
+    # Worker and WebUI are on the same host (much faster)
+    if ($opts->{local} && $self->is_local) {
+        $self->emit('upload_local.prepare');
+        my $local = path(assetdir(), 'tmp', $opts->{asset}, "$file_name.local");
+        path($opts->{file})->copy_to($local);
+        my $res = $self->client->start(
+            $self->_build_post(
+                "$uri/artefact" => {
+                    file  => {filename => $file_name, content => ''},
+                    asset => $opts->{asset},
+                    local => $local->to_string
+                }));
+        $self->emit('upload_local.response' => $res);
+        return undef;
+    }
+
     my $chunk_size = $opts->{chunk_size} // 1000000;
     my $pieces     = OpenQA::File->new(file => Mojo::File->new($opts->{file}))->split($chunk_size);
     $self->emit('upload_chunk.prepare' => $pieces);

@@ -1334,7 +1334,7 @@ sub create_artefact {
 }
 
 sub create_asset {
-    my ($self, $asset, $scope) = @_;
+    my ($self, $asset, $scope, $local) = @_;
 
     my $fname = $asset->filename;
 
@@ -1354,8 +1354,16 @@ sub create_asset {
     my $temp_final_file   = path($temp_chunk_folder, $fname);
     my $final_file        = path($fpath,             $fname);
 
-    $fpath->make_path             unless -d $fpath;
-    $temp_path->make_path         unless -d $temp_path;
+    $fpath->make_path     unless -d $fpath;
+    $temp_path->make_path unless -d $temp_path;
+
+    # Worker and WebUI are on the same host (much faster)
+    if ($local) {
+        path($local)->move_to($final_file);
+        chmod 0644, $final_file;
+        return 0, $fname, $type, 1;
+    }
+
     $temp_chunk_folder->make_path unless -d $temp_chunk_folder;
 
     # XXX : Moving this to subprocess/promises won't help much

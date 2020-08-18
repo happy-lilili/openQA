@@ -82,6 +82,24 @@ subtest 'upload public assets' => sub {
     $t->json_is('/name' => 'hdd_image2.qcow2', 'name is expected for public asset');
 };
 
+subtest 'upload public assets (local)' => sub {
+    my $chunkdir = 't/data/openqa/share/factory/tmp/public/hdd_image5.qcow2.CHUNKS/';
+    my $rp       = "t/data/openqa/share/factory/hdd/hdd_image5.qcow2";
+
+    local $@;
+    eval {
+        $t->ua->upload->asset(
+            99963 => {chunk_size => $chunk_size, file => $filename, name => 'hdd_image5.qcow2', local => 1});
+    };
+    ok !$@, 'No upload errors' or die explain $@;
+    path($chunkdir)->remove_tree;
+    ok !-d $chunkdir, 'Chunk directory should not exist anymore';
+    ok -e $rp,        'Asset exists after upload';
+    is $sum, OpenQA::File->file_digest($rp), 'checksum matches for public asset';
+    $t->get_ok('/api/v1/assets/hdd/hdd_image5.qcow2')->status_is(200);
+    $t->json_is('/name' => 'hdd_image5.qcow2', 'name is expected for public asset');
+};
+
 subtest 'upload private assets' => sub {
     my $chunkdir = 't/data/openqa/share/factory/tmp/private/00099963-hdd_image3.qcow2.CHUNKS/';
     my $rp       = "t/data/openqa/share/factory/hdd/00099963-hdd_image3.qcow2";
